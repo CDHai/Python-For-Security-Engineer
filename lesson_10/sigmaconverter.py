@@ -28,17 +28,22 @@ def convert_sigma_to_splunk(sigma_file_path):
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
-        print(f"Error converting {sigma_file_path}: {e}")
+        error_msg = e.stderr.strip() if e.stderr else str(e)
+        print(f"Error converting {sigma_file_path}: {error_msg}")
         return ""
 
 def extract_sigma_info(sigma_file_path):
-    with open(sigma_file_path, 'r') as sigma_file:
-        content = yaml.safe_load(sigma_file)
-        title = content.get("title", "")
-        description = content.get("description", "")
-        technique = content.get("detection", {}).get("condition", "")
-        splunk_query = convert_sigma_to_splunk(sigma_file_path)
-        return title, description, technique, splunk_query
+    try:
+        with open(sigma_file_path, 'r', encoding='utf-8') as sigma_file:
+            content = yaml.safe_load(sigma_file)
+            title = content.get("title", "")
+            description = content.get("description", "")
+            technique = content.get("detection", {}).get("condition", "")
+            splunk_query = convert_sigma_to_splunk(sigma_file_path)
+            return title, description, technique, splunk_query
+    except (UnicodeDecodeError, yaml.YAMLError) as e:
+        print(f"Error reading {sigma_file_path}: {e}")
+        return "", "", "", ""
 
 def convert_sigma_to_excel():
     data = []
@@ -58,13 +63,12 @@ def convert_sigma_to_excel():
     df.to_excel(EXCEL_FILE, index=False)
 
 def job():
-    current_time = datetime.now()
     pull_sigma_rules()
     convert_sigma_to_excel()
-    print("Rules last updated at: ", current_time)
+    print("Last updated at: ", datetime.now())
 
 def main():
-    schedule.every(10).minutes.do(job)
+    schedule.every(2).minutes.do(job)
     while True:
         schedule.run_pending()
         time.sleep(1)
